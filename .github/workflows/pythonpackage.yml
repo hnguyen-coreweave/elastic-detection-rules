@@ -38,6 +38,7 @@ jobs:
         # only run the test test_rule_change_has_updated_date on pull request events to main
         GITHUB_EVENT_NAME: "${{ github.event_name}}"
       run: |
+        export CUSTOM_RULES_DIR="cw_dac"
         python -m detection_rules test
 
     - name: Build release package

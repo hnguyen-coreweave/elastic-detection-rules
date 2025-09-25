@@ -1,4 +1,4 @@
-[justkidding_metadata]
+[metadata]
 creation_date = "2023/07/25"
 integration = ["endpoint"]
 maturity = "production"
@@ -61,9 +61,9 @@ timestamp_override = "event.ingested"
 type = "eql"
 
 query = '''
-process where host.os.type == "linux" and event.type == "start" and event.action == "exec" and
-(
-  (process.name == "docker" and process.args : "run" and process.args : "-it"  and
+cess where host.os.type == "linux" and event.type == "start" and event.action == "exec" and
+
+process.name == "docker" and process.args : "run" and process.args : "-it"  and
    process.args : ("unix://*/docker.sock", "unix://*/dockershim.sock")) or
   (process.name == "socat" and process.args : ("UNIX-CONNECT:*/docker.sock", "UNIX-CONNECT:*/dockershim.sock"))
 ) and not user.Ext.real.id : "0" and not group.Ext.real.id : "0"

@@ -1,0 +1,74 @@
+name: ES|QL Validation
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Target Detection Rules Branch (e.g. esql_testing)'
+        required: true
+        default: 'esql_testing'
+      rule_id:
+        description: 'Rule ID to validate against esql'
+        required: false
+
+jobs:
+  build-and-validate:
+    runs-on: ubuntu-latest
+    env:
+      STACK_VERSION: 9.1.2
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          path: elastic-container
+          repository: eric-forte-elastic/elastic-container
+
+      - name: Build and run containers
+        run: |
+          cd elastic-container
+          sed -i 's/STACK_VERSION=.*/STACK_VERSION=${{ env.STACK_VERSION }}/' .env
+          sed -i 's/changeme/${{ secrets.PASSWORD }}/' .env
+          set -x
+          bash elastic-container.sh start
+      - name: Setup ESQL_Validate
+        uses: actions/checkout@v4
+
+      - name: Setup Detection Rules
+        uses: actions/checkout@v4
+        with:
+          path: detection-rules
+          repository: elastic/detection-rules
+          ref: ${{ github.event.inputs.target_branch || 'esql_testing' }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          cd elastic-detection-rules
+          python -m pip install --upgrade pip
+          pip cache purge
+          pip install .[dev]
+          # Install remarshal to convert TOML to JSON
+          pip install remarshal
+          # Install pandas to help add mappings
+          pip install pandas
+      - name: List Elasticsearch indices
+        run: |
+          curl -k -X GET "https://localhost:9200/_cat/indices?v=true&s=index&pretty" -u "elastic:${{ secrets.PASSWORD }}"
+        continue-on-error: true
+
+      - name: Validate Test ESQL Rule
+        env:
+          DR_ELASTICSEARCH_URL: "https://localhost:9200"
+          DR_ES_USER: "elastic"
+          DR_ES_PASSWORD: "${{ secrets.PASSWORD }}"
+          DR_VALIDATE_ESQL: true
+        run: |
+          cd detection-rules
+          pytest tests/test_all_rules.py::TestESQLRules
